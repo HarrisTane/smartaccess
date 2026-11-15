@@ -2,9 +2,9 @@
 
 # Zusammenarbeit im SmartAccess-Team
 
-- **Person A** – `@HarrisTane`
-- **Person B** – `@Sr-Hr20`
-- **Person C** – `@newspringh`
+- **Person A** – @HarrisTane
+- **Person B** – @Sr-Hr20
+- **Person C** – @newspringh
 
 Wir arbeiten die Implementierungs-Roadmap in der vereinbarten Reihenfolge ab. Beim Start jeder Phase halten wir im zugehörigen GitHub-Issue fest, wer koordiniert, wer eine Teilaufgabe übernimmt und wer den Pull Request prüft.
 
