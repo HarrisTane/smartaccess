@@ -1,62 +1,99 @@
+
 services:
   postgres:
     image: postgres:16-alpine
-    healthcheck:
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "midpoint", "-d", "midpoint"]
-      interval: 5s
-      timeout: 3s
-      retries: 12  
+    restart: unless-stopped
+
     environment:
       POSTGRES_DB: midpoint
       POSTGRES_USER: midpoint
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss gesetzt sein}"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Passwort fehlt}
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U midpoint -d midpoint"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   midpoint-init:
-    image: evolveum/midpoint:4.11.0-alpine
+    image: evolveum/midpoint:4.11.0
+    restart: "no"
+
     depends_on:
       postgres:
         condition: service_healthy
+
     working_dir: /opt/midpoint
+
     command:
-      - bash
+      - sh
       - -ec
       - |
         bin/midpoint.sh init-native
-        bin/ninja.sh -B info >/tmp/midpoint-info.out 2>/tmp/midpoint-info.err || true
-        if grep -q 'ERROR' /tmp/midpoint-info.err; then
+
+        echo "Pruefe midPoint Repository..."
+
+        if bin/ninja.sh -B info >/dev/null 2>/tmp/ninja.log; then
+          echo "Repository bereits initialisiert."
+        elif grep -q "ERROR" /tmp/ninja.log; then
+          echo "Repository nicht verfuegbar."
+          echo "Versuche erstmalige Schemaerstellung..."
+
           bin/ninja.sh run-sql --create --mode REPOSITORY
           bin/ninja.sh run-sql --create --mode AUDIT
+        else
+          cat /tmp/ninja.log
+          exit 1
         fi
+
+        echo "Ueberpruefe Repository..."
         bin/ninja.sh -B info
+
+        echo "Initialisierung abgeschlossen."
+
     environment:
       MP_INIT_CFG: /opt/midpoint/var
       MP_SET_midpoint_repository_database: postgresql
-      MP_SET_midpoint_repository_jdbcUrl: "jdbc:postgresql://postgres:5432/midpoint"
+      MP_SET_midpoint_repository_jdbcUrl: jdbc:postgresql://postgres:5432/midpoint
       MP_SET_midpoint_repository_jdbcUsername: midpoint
-      MP_SET_midpoint_repository_jdbcPassword: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss gesetzt sein}"
+      MP_SET_midpoint_repository_jdbcPassword: ${POSTGRES_PASSWORD:?Passwort fehlt}
+
     volumes:
       - midpoint_home:/opt/midpoint/var
 
   midpoint:
-    image: evolveum/midpoint:4.11.0-alpine
-    command: ["/opt/midpoint/bin/midpoint.sh", "container"]
+    image: evolveum/midpoint:4.11.0
+    restart: unless-stopped
+
+    command:
+      - /opt/midpoint/bin/midpoint.sh
+      - container
+
     depends_on:
       postgres:
         condition: service_healthy
       midpoint-init:
         condition: service_completed_successfully
+
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8083:8080"
+
     environment:
+      JAVA_OPTS: "-Xms512m -Xmx2g"
+
       MP_SET_midpoint_repository_database: postgresql
-      MP_SET_midpoint_repository_jdbcUrl: "jdbc:postgresql://postgres:5432/midpoint"
+      MP_SET_midpoint_repository_jdbcUrl: jdbc:postgresql://postgres:5432/midpoint
       MP_SET_midpoint_repository_jdbcUsername: midpoint
-      MP_SET_midpoint_repository_jdbcPassword: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss gesetzt sein}"
-      MP_SET_midpoint_administrator_initialPassword: "${MIDPOINT_ADMIN_PASSWORD:?MIDPOINT_ADMIN_PASSWORD muss gesetzt sein}"
+      MP_SET_midpoint_repository_jdbcPassword: ${POSTGRES_PASSWORD:?Passwort fehlt}
+
+      MP_SET_midpoint_administrator_initialPassword: ${MIDPOINT_ADMIN_PASSWORD:?Admin-Passwort fehlt}
+
       MP_UNSET_midpoint_repository_hibernateHbm2ddl: "1"
       MP_NO_ENV_COMPAT: "1"
+
     volumes:
       - midpoint_home:/opt/midpoint/var
 
