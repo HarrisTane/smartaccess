@@ -2,9 +2,9 @@
 
 # Zusammenarbeit im SmartAccess-Team
 
-- **Person A** – @HarrisTane
-- **Person B** – @Sr-Hr20
-- **Person C** – @newspringh
+- **Person A** – `@HarrisTane`
+- **Person B** – `@Sr-Hr20`
+- **Person C** – `@newspringh`
 
 Wir arbeiten die Implementierungs-Roadmap in der vereinbarten Reihenfolge ab. Beim Start jeder Phase halten wir im zugehörigen GitHub-Issue fest, wer koordiniert, wer eine Teilaufgabe übernimmt und wer den Pull Request prüft.
 
@@ -19,7 +19,7 @@ Wir wechseln die Rollen über die Phasen hinweg, damit alle drei praktisch an ve
 | Phase | Implementierungsphase | Koordination | Umsetzung | Review |
 | --- | --- | --- | --- | --- |
 | 01 | Repository und Zusammenarbeit | A | A | B oder C |
-| 02 | midPoint lokal mit Docker Compose | A | C | A |
+| 02 | midPoint lokal mit Docker Compose | A | B | C |
 | 03 | Eigenes Multi-Stage-Image | C | A | B |
 | 04 | IAM-Datenmodell und Rollen | A | B | C |
 | 05 | Zugriffsanträge und Genehmigungen | B | C | A |
