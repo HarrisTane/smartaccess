@@ -1,7 +1,5 @@
 # Zusammenarbeit im SmartAccess-Team
 
-# Zusammenarbeit im SmartAccess-Team
-
 - **Person A** – `@HarrisTane`
 - **Person B** – `@Sr-Hr20`
 - **Person C** – `@newspringh`
