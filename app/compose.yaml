@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "midpoint", "-d", "midpoint"]
+      interval: 5s
+      timeout: 3s
+      retries: 12  
+    environment:
+      POSTGRES_DB: midpoint
+      POSTGRES_USER: midpoint
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss gesetzt sein}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      
+  midpoint-init:
+    image: evolveum/midpoint:4.11.0-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /opt/midpoint
+    command:
+      - bash
+      - -ec
+      - |
+        bin/midpoint.sh init-native
+        bin/ninja.sh -B info >/tmp/midpoint-info.out 2>/tmp/midpoint-info.err || true
+        if grep -q 'ERROR' /tmp/midpoint-info.err; then
+          bin/ninja.sh run-sql --create --mode REPOSITORY
+          bin/ninja.sh run-sql --create --mode AUDIT
+        fi
+        bin/ninja.sh -B info
+    environment:
+      MP_INIT_CFG: /opt/midpoint/var
+      MP_SET_midpoint_repository_database: postgresql
+      MP_SET_midpoint_repository_jdbcUrl: "jdbc:postgresql://postgres:5432/midpoint"
+      MP_SET_midpoint_repository_jdbcUsername: midpoint
+      MP_SET_midpoint_repository_jdbcPassword: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss gesetzt sein}"
+    volumes:
+      - midpoint_home:/opt/midpoint/var
+
+  midpoint:
+    image: evolveum/midpoint:4.11.0-alpine
+    command: ["/opt/midpoint/bin/midpoint.sh", "container"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      midpoint-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      MP_SET_midpoint_repository_database: postgresql
+      MP_SET_midpoint_repository_jdbcUrl: "jdbc:postgresql://postgres:5432/midpoint"
+      MP_SET_midpoint_repository_jdbcUsername: midpoint
+      MP_SET_midpoint_repository_jdbcPassword: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss gesetzt sein}"
+      MP_SET_midpoint_administrator_initialPassword: "${MIDPOINT_ADMIN_PASSWORD:?MIDPOINT_ADMIN_PASSWORD muss gesetzt sein}"
+      MP_UNSET_midpoint_repository_hibernateHbm2ddl: "1"
+      MP_NO_ENV_COMPAT: "1"
+    volumes:
+      - midpoint_home:/opt/midpoint/var
+
+volumes:
+  postgres_data:
+  midpoint_home:
