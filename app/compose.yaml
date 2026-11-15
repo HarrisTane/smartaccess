@@ -29,30 +29,16 @@ services:
     working_dir: /opt/midpoint
 
     command:
-      - sh
+      - bash
       - -ec
       - |
+        echo "Bereite midPoint-Konfiguration vor..."
         bin/midpoint.sh init-native
 
-        echo "Pruefe midPoint Repository..."
-
-        if bin/ninja.sh -B info >/dev/null 2>/tmp/ninja.log; then
-          echo "Repository bereits initialisiert."
-        elif grep -q "ERROR" /tmp/ninja.log; then
-          echo "Repository nicht verfuegbar."
-          echo "Versuche erstmalige Schemaerstellung..."
-
-          bin/ninja.sh run-sql --create --mode REPOSITORY
-          bin/ninja.sh run-sql --create --mode AUDIT
-        else
-          cat /tmp/ninja.log
-          exit 1
-        fi
-
-        echo "Ueberpruefe Repository..."
+        echo "Pruefe Datenbank und Repository..."
         bin/ninja.sh -B info
 
-        echo "Initialisierung abgeschlossen."
+        echo "Repository-Pruefung erfolgreich."
 
     environment:
       MP_INIT_CFG: /opt/midpoint/var
