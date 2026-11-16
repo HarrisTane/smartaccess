@@ -36,7 +36,12 @@ services:
         bin/midpoint.sh init-native
 
         echo "Pruefe Datenbank und Repository..."
-        bin/ninja.sh -B info
+        if ! bin/ninja.sh -B info; then
+          echo "Repository fehlt, lege Schema an..."
+          bin/ninja.sh run-sql --create --mode REPOSITORY
+          bin/ninja.sh run-sql --create --mode AUDIT
+          bin/ninja.sh -B info
+        fi
 
         echo "Repository-Pruefung erfolgreich."
 
