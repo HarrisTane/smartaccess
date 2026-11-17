@@ -18,6 +18,33 @@ services:
       timeout: 3s
       retries: 12
 
+  db-check:
+    image: postgres:16-alpine
+    restart: "no"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Passwort fehlt}
+
+    command:
+      - sh
+      - -ec
+      - |
+        echo "Frage die Datenbank, ob schon Tabellen existieren..."
+        count=$$(psql -h postgres -U midpoint -d midpoint -tA -c "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema')")
+        if [ "$$count" = "0" ]; then
+          echo empty > /state/db_state
+        else
+          echo filled > /state/db_state
+        fi
+        echo "Zustand der Datenbank: $$(cat /state/db_state)"
+
+    volumes:
+      - init_state:/state
+      
   midpoint-init:
     image: evolveum/midpoint:4.11.0
     restart: "no"
@@ -25,6 +52,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-check:
+        condition: service_completed_successfully
 
     working_dir: /opt/midpoint
 
@@ -35,13 +64,16 @@ services:
         echo "Bereite midPoint-Konfiguration vor..."
         bin/midpoint.sh init-native
 
-        echo "Pruefe Datenbank und Repository..."
-        if ! bin/ninja.sh -B info; then
-          echo "Repository fehlt, lege Schema an..."
+        state=$$(cat /state/db_state)
+        echo "Zustand der Datenbank: $$state"
+        if [ "$$state" = "empty" ]; then
+          echo "Datenbank ist leer, lege Schema an..."
           bin/ninja.sh run-sql --create --mode REPOSITORY
           bin/ninja.sh run-sql --create --mode AUDIT
-          bin/ninja.sh -B info
         fi
+
+        echo "Pruefe Datenbank und Repository..."
+        bin/ninja.sh -B info
 
         echo "Repository-Pruefung erfolgreich."
 
@@ -54,6 +86,7 @@ services:
 
     volumes:
       - midpoint_home:/opt/midpoint/var
+      - init_state:/state:ro
 
   midpoint:
     image: evolveum/midpoint:4.11.0
@@ -91,3 +124,4 @@ services:
 volumes:
   postgres_data:
   midpoint_home:
+  init_state:
