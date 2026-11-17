@@ -1,2 +1,2 @@
 # smartaccess
-Cloud-Portal für befristete Zugriffsrechte mit Microsoft Entra ID
+Cloud-Portal für befristete Zugriffsrechte mit keycloak
