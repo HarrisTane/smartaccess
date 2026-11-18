@@ -15,7 +15,7 @@ Wir richten in Phase 1 das Repository und die Zusammenarbeit im Dreierteam ein. 
 | `infra/` | Terraform und cloud-init für OpenStack |
 | `k8s/` | Kubernetes-Konfiguration und Helm-Dateien |
 
-## plan 
+## plan
 
 | Phase | Implementierungsphase | Koordination | Umsetzung | Review |
 | --- | --- | --- | --- | --- |
@@ -41,4 +41,3 @@ Wir richten in Phase 1 das Repository und die Zusammenarbeit im Dreierteam ein. 
 - **Orchestrierung** mit Kubernetes, Helm und Ingress
 - **CI/CD** mit GitHub Actions für Build, Tests, Image-Veröffentlichung und Deployment nach `dev` und `staging`
 - **Monitoring** mit Prometheus, Grafana und zwei eigenen Dashboards
-  
