@@ -2,15 +2,6 @@
  
 SmartAccess nutzt Evolveum midPoint mit PostgreSQL. Diese Anleitung startet beides auf deinem Rechner (Windows oder Mac) mit Docker Compose und zeigt, wie du prüfst, dass Daten einen Neustart der Container überstehen.
  
-
-## Hinweis zum Umstieg von Phase 2 auf Phase 3
-
-Der midPoint-Datenbankdienst heißt seit Phase 3 `midpoint-db` (zuvor `postgres`), das zugehörige Compose-Volume `midpoint_db_data` (zuvor `postgres_data`). Datenbankname und Benutzer bleiben `midpoint`; Image `postgres:16-alpine` und Passwortvariable `POSTGRES_PASSWORD` bleiben unverändert.
-
-**Die Umbenennung des Volumes übernimmt keine vorhandenen Daten.** Compose verwendet mit dem neuen Namen ein neues Volume, normalerweise `app_midpoint_db_data`. Das bisherige Volume, normalerweise `app_postgres_data`, bleibt bestehen, wird aber nicht automatisch eingebunden. Der tatsächliche Präfix hängt vom Compose-Projektnamen ab.
-
-Wer bestehende Daten behalten möchte, muss vor dem Start entweder das bisherige Volume ausdrücklich zuordnen oder die Daten per Backup und Restore migrieren. Ein bewusst gewählter Neustart mit leerer Datenbank ist ebenfalls möglich; die bisherigen Benutzer und Testobjekte stehen dort dann nicht zur Verfügung. Vor einem Wechsel muss der bisherige Datenbankcontainer gestoppt sein; zwei PostgreSQL-Instanzen dürfen nicht gleichzeitig dasselbe Datenvolume verwenden. `docker compose down -v` ist kein Migrationsschritt und löscht die von Compose verwalteten Volumes.
-
 ## 1. Voraussetzungen
  
 - Git ist installiert.
