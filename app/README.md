@@ -2,6 +2,15 @@
  
 SmartAccess nutzt Evolveum midPoint mit PostgreSQL. Diese Anleitung startet beides auf deinem Rechner (Windows oder Mac) mit Docker Compose und zeigt, wie du prüfst, dass Daten einen Neustart der Container überstehen.
  
+
+## Hinweis zum Umstieg von Phase 2 auf Phase 3
+
+Der midPoint-Datenbankdienst heißt seit Phase 3 `midpoint-db` (zuvor `postgres`), das zugehörige Compose-Volume `midpoint_db_data` (zuvor `postgres_data`). Datenbankname und Benutzer bleiben `midpoint`; Image `postgres:16-alpine` und Passwortvariable `POSTGRES_PASSWORD` bleiben unverändert.
+
+**Die Umbenennung des Volumes übernimmt keine vorhandenen Daten.** Compose verwendet mit dem neuen Namen ein neues Volume, normalerweise `app_midpoint_db_data`. Das bisherige Volume, normalerweise `app_postgres_data`, bleibt bestehen, wird aber nicht automatisch eingebunden. Der tatsächliche Präfix hängt vom Compose-Projektnamen ab.
+
+Wer bestehende Daten behalten möchte, muss vor dem Start entweder das bisherige Volume ausdrücklich zuordnen oder die Daten per Backup und Restore migrieren. Ein bewusst gewählter Neustart mit leerer Datenbank ist ebenfalls möglich; die bisherigen Benutzer und Testobjekte stehen dort dann nicht zur Verfügung. Vor einem Wechsel muss der bisherige Datenbankcontainer gestoppt sein; zwei PostgreSQL-Instanzen dürfen nicht gleichzeitig dasselbe Datenvolume verwenden. `docker compose down -v` ist kein Migrationsschritt und löscht die von Compose verwalteten Volumes.
+
 ## 1. Voraussetzungen
  
 - Git ist installiert.
@@ -60,7 +69,7 @@ Beim ersten Mal lädt Docker die Images herunter und legt die Datenbank an. Das 
  
 Es starten vier Dienste nacheinander:
  
-1. `postgres`: die Datenbank.
+1. `midpoint-db`: die Datenbank.
 2. `db-check`: prüft, ob die Datenbank erreichbar ist und ob sie schon Tabellen enthält. Bei einem Fehler (zum Beispiel falsches Passwort) bricht der Start hier ab.
 3. `midpoint-init`: bereitet die Konfiguration vor. Er legt das Datenbankschema nur an, wenn `db-check` eine leere Datenbank gemeldet hat, und prüft danach das Repository.
 4. `midpoint`: die Anwendung. Sie startet erst, wenn `midpoint-init` erfolgreich war.
@@ -73,7 +82,7 @@ docker compose ps
 ```
  
 Erwartet:
-- `postgres` ist `healthy`.
+- `midpoint-db` ist `healthy`.
 - `midpoint` ist `Up` und nach kurzer Zeit `healthy`. Der Port ist `127.0.0.1:8080`, also nur von deinem Rechner aus erreichbar.
 - `db-check` und `midpoint-init` tauchen nicht als laufend auf. Sie beenden sich nach getaner Arbeit. Das ist richtig.
 Ob die Datenbank neu angelegt oder weiterverwendet wurde, siehst du im Log:
@@ -113,7 +122,7 @@ docker compose up -d
 ```
 4. Warte, bis `docker compose ps` bei `midpoint` wieder `healthy` zeigt, und melde dich erneut an.
 5. Prüfe unter **Benutzer**, **Alle Benutzer**, ob `persistenz-test` noch existiert.
-Erwartet: Der Benutzer ist noch da. Die Daten liegen in den benannten Volumes `postgres_data` und `midpoint_home`, nicht in den Containern. Im Log aus Abschnitt 5 steht beim Neustart `filled`.
+Erwartet: Der Benutzer ist noch da. Die Daten liegen in den benannten Volumes `midpoint_db_data` und `midpoint_home`, nicht in den Containern. Im Log aus Abschnitt 5 steht beim Neustart `filled`.
  
 ## 8. Wenn etwas nicht klappt
  
