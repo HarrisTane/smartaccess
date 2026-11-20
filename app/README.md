@@ -1,150 +1,258 @@
-# SmartAccess: midPoint lokal starten
- 
-SmartAccess nutzt Evolveum midPoint mit PostgreSQL. Diese Anleitung startet beides auf deinem Rechner (Windows oder Mac) mit Docker Compose und zeigt, wie du prüfst, dass Daten einen Neustart der Container überstehen.
- 
+# SmartAccess: midPoint und Keycloak lokal starten
+
+Diese Anleitung beschreibt den lokalen Betrieb von midPoint und einem eigenen, optimierten Keycloak-Image mit Docker Compose. Beide Dienste verwenden jeweils eine separate PostgreSQL-Datenbank.
+
+Das Keycloak-Image wird mit einem Multi-Stage-Dockerfile gebaut. Die Anleitung umfasst Build, Start, Weblogin, Health-/Metrics-Prüfungen und Persistenztests.
+
+Die Verbindung zwischen midPoint und Keycloak für die Provisionierung folgt in Phase 6 und ist hier noch nicht eingerichtet.
+
 ## 1. Voraussetzungen
- 
+
 - Git ist installiert.
 - Docker Desktop läuft. Prüfen:
 ```
 docker version
 ```
   Die Ausgabe muss `Client` und `Server` zeigen.
-- Port 8080 ist frei. Sonst schlägt der Start mit einem Port-Fehler fehl (siehe Abschnitt 8).
+- Die lokalen Ports 8080 (midPoint), 8081 (Keycloak) und 9000 (Keycloak-Management) sind frei. Die veröffentlichten Ports sind ausschließlich an 127.0.0.1 gebunden.
 - Genug Arbeitsspeicher für Docker. `compose.yaml` erlaubt midPoint bis zu 2 GB Java-Speicher.
+
 ## 2. Repository holen
- 
-Terminal: PowerShell (Windows) oder Terminal (Mac), in dem Ordner, in dem du Projekte ablegst.
- 
-```
+
+Das Repository klonen und in den Projektordner wechseln:
+
+```bash
 git clone https://github.com/HarrisTane/smartaccess.git
-cd smartaccess/app
+cd smartaccess
 ```
- 
-Alle weiteren Befehle laufen im Ordner `app`. Dort liegen `compose.yaml` und `.env.example`.
- 
+
+Solange Phase 3 noch nicht in `main` integriert ist, den Implementierungsbranch auswählen:
+
+```bash
+git switch feat/phase-3-keycloak-image
+```
+
+Nach der Integration der vollständigen Phase 3 in `main` ist dieser zusätzliche Branchwechsel nicht mehr erforderlich.
+
+Anschließend in den Anwendungsordner wechseln:
+
+```bash
+cd app
+```
+
+Alle weiteren Befehle laufen im Ordner `app`. Dort liegen `compose.yaml` und `.env.example`. Das Dockerfile und die .dockerignore liegen unter `keycloak/`.
+
 ## 3. Lokale Zugangsdaten einrichten
- 
+
 Die Datei `.env` enthält deine Passwörter. Sie bleibt lokal und darf nie ins Git. Prüfe, dass Git sie ignoriert:
- 
+
 ```
 git check-ignore .env
 ```
- 
+
 Die Ausgabe muss `.env` lauten. Bei leerer Ausgabe nicht weitermachen und im Team melden.
- 
+
 Datei anlegen:
- 
+
 | System | Befehl |
 | --- | --- |
 | Windows (PowerShell) | `copy .env.example .env` |
 | Mac (Terminal) | `cp .env.example .env` |
- 
-Öffne `.env` in VS Code (`code .env`) oder einem Editor deiner Wahl. Trage hinter jedes `=` ein eigenes Passwort ein, ohne Leerzeichen und ohne Anführungszeichen. Die beiden Passwörter müssen verschieden sein:
- 
+
+Öffne `.env` in VS Code (`code .env`) oder einem Editor deiner Wahl. Trage hinter jedes `=` ein eigenes Passwort ein, ohne Leerzeichen und ohne Anführungszeichen. Für jede der vier Variablen ein eigenes, unterschiedliches Passwort eintragen:
+
 | Variable | Wofür |
 | --- | --- |
-| `POSTGRES_PASSWORD` | Passwort der Datenbank. midPoint nutzt es im Hintergrund, du tippst es nie ein. |
-| `MIDPOINT_ADMIN_PASSWORD` | Passwort für den Weblogin als `administrator`. |
- 
+| `POSTGRES_PASSWORD` | Passwort der midPoint-Datenbank. |
+| `MIDPOINT_ADMIN_PASSWORD` | Weblogin bei midPoint als `administrator`. |
+| `KEYCLOAK_DB_PASSWORD` | Passwort der separaten Keycloak-Datenbank. |
+| `KEYCLOAK_ADMIN_PASSWORD` | Weblogin bei Keycloak als `admin`. |
+
 Hinweise:
 - Das Admin-Passwort muss die Passwort-Richtlinie von midPoint erfüllen, sonst wird der Benutzer `administrator` nicht angelegt. Nimm mindestens 12 Zeichen mit Groß- und Kleinbuchstaben, Ziffern und einem Sonderzeichen.
 - Verwende keine Passwörter, die du anderswo nutzt. Schreibe sie nicht in Issues, Chats oder Commits.
-## 4. Starten
- 
+
+## 4. Image bauen und Stack starten
+
+Die folgenden Befehle werden im Ordner `app` ausgeführt. Für einen getrennten lokalen Test verwenden wir durchgehend den Projektnamen `smartaccess-phase3-test`. Dadurch entstehen eigene Netzwerke und Volumes. Andere laufende Dienste dürfen die Ports 8080, 8081 und 9000 nicht belegen.
+
+Zuerst die Konfiguration prüfen, ohne Zugangsdaten auszugeben:
+
+```bash
+docker compose -p smartaccess-phase3-test config --quiet
 ```
-docker compose up -d
+
+Das eigene Keycloak-Image bauen:
+
+```bash
+docker compose -p smartaccess-phase3-test build keycloak
 ```
- 
-Beim ersten Mal lädt Docker die Images herunter und legt die Datenbank an. Das kann einige Minuten dauern.
- 
-Es starten vier Dienste nacheinander:
- 
-1. `midpoint-db`: die Datenbank.
-2. `db-check`: prüft, ob die Datenbank erreichbar ist und ob sie schon Tabellen enthält. Bei einem Fehler (zum Beispiel falsches Passwort) bricht der Start hier ab.
-3. `midpoint-init`: bereitet die Konfiguration vor. Er legt das Datenbankschema nur an, wenn `db-check` eine leere Datenbank gemeldet hat, und prüft danach das Repository.
-4. `midpoint`: die Anwendung. Sie startet erst, wenn `midpoint-init` erfolgreich war.
-## 5. Prüfen, ob alles läuft
- 
-Warte nach dem Start ein bis zwei Minuten und prüfe den Status:
- 
+
+Das Dockerfile verwendet Keycloak 26.8.2 in zwei benannten Stufen:
+
+- `builder`: Bereitet Keycloak mit `kc.sh build` für PostgreSQL, Health und Metrics vor. Dafür werden keine laufende Datenbank und keine Zugangsdaten benötigt.
+- `runtime`: Übernimmt das vorbereitete Ergebnis und startet Keycloak mit `start --optimized`.
+
+Datenbankadresse, Zugangsdaten, Hostname und die lokale HTTP-Konfiguration werden erst beim Start über Compose bereitgestellt. Die `.env` gehört nicht in das Image. Der Build-Kontext ist auf `app/keycloak` begrenzt; dessen `.dockerignore` lässt nur Dockerfile und .dockerignore zu.
+
+Der Multi-Stage-Build verlagert die Vorbereitung in den Image-Build. Eine bestimmte Größenersparnis wird damit nicht behauptet.
+
+Anschließend den Stack starten:
+
+```bash
+docker compose -p smartaccess-phase3-test up -d
 ```
-docker compose ps
+
+Der Stack enthält sechs Dienste:
+
+- `midpoint-db` → `db-check` → `midpoint-init` → `midpoint`
+- `keycloak-db` → `keycloak`
+
+Die Anwendungen warten auf ihre jeweiligen Voraussetzungen. PostgreSQL verwendet das Image `postgres:16-alpine`. Beide Datenbanken haben getrennte benannte Volumes.
+
+HTTP ist hier ausschließlich für den lokalen Test vorgesehen. HTTPS/Ingress und die produktive Secret-Verwaltung folgen in späteren Phasen.
+
+## 5. Status, Health und Metrics prüfen
+
+Nach dem Start kurz warten und alle Container anzeigen:
+
+```bash
+docker compose -p smartaccess-phase3-test ps -a
 ```
- 
+
 Erwartet:
-- `midpoint-db` ist `healthy`.
-- `midpoint` ist `Up` und nach kurzer Zeit `healthy`. Der Port ist `127.0.0.1:8080`, also nur von deinem Rechner aus erreichbar.
-- `db-check` und `midpoint-init` tauchen nicht als laufend auf. Sie beenden sich nach getaner Arbeit. Das ist richtig.
-Ob die Datenbank neu angelegt oder weiterverwendet wurde, siehst du im Log:
- 
-| System | Befehl |
-| --- | --- |
-| Windows (PowerShell) | `docker compose logs db-check midpoint-init \| Select-String "Zustand\|leer\|erfolgreich"` |
-| Mac (Terminal) | `docker compose logs db-check midpoint-init \| grep -E "Zustand\|leer\|erfolgreich"` |
- 
-`empty` bedeutet: Die Datenbank war leer, das Schema wurde angelegt. `filled` bedeutet: Die Datenbank war schon da, es wurde nichts neu angelegt.
- 
-Fortschritt von midPoint im Log ansehen (Strg+C beendet nur die Anzeige):
- 
+
+- `midpoint-db` und `keycloak-db` sind `healthy`.
+- `db-check` und `midpoint-init` sind mit `Exited (0)` beendet.
+- `midpoint` ist nach dem Start `healthy`.
+- `keycloak` ist `Up`. Seine Bereitschaft wird über die folgenden HTTP-Abfragen geprüft; `Up` allein reicht dafür nicht aus.
+
+Die folgenden curl-Befehle sind für das Terminal unter macOS/Linux vorgesehen. Unter Windows gegebenenfalls `curl.exe` verwenden.
+
+```bash
+curl --fail --silent --show-error --write-out '\nHTTP %{http_code}\n' http://localhost:9000/health/live
+curl --fail --silent --show-error --write-out '\nHTTP %{http_code}\n' http://localhost:9000/health/ready
+curl --fail --silent --show-error --write-out '\nHTTP %{http_code}\n' http://localhost:9000/metrics
 ```
-docker compose logs -f midpoint
+
+Erwartet:
+
+- `/health/live`: HTTP 200 und JSON-Status `UP`.
+- `/health/ready`: HTTP 200 und JSON-Status `UP`, einschließlich der Datenbankprüfung.
+- `/metrics`: HTTP 200 und Metrikdaten mit Einträgen wie `# HELP` und `# TYPE`.
+
+Keycloak läuft ohne Root-Benutzer. Prüfen:
+
+```bash
+docker compose -p smartaccess-phase3-test exec -T keycloak id
 ```
- 
+
+Im Mac-Test war das Ergebnis `uid=1000(keycloak) gid=0(root)`. Die UID ist nicht 0; die Gruppenzugehörigkeit ist davon zu unterscheiden.
+
+Den erkannten Zustand der midPoint-Datenbank unter macOS/Linux prüfen:
+
+```bash
+docker compose -p smartaccess-phase3-test logs db-check midpoint-init | grep -E 'Zustand|vorhanden|ueberspringe|erfolgreich'
+```
+
+`empty` kennzeichnet eine leere Datenbank. Bei vorhandenen Tabellen wird `filled` gemeldet und die Schema-Erstellung übersprungen.
+
 ## 6. Weblogin
- 
-1. Öffne http://localhost:8080/midpoint/ im Browser.
+
+### midPoint
+
+1. http://localhost:8080/midpoint/ öffnen.
 2. Benutzername: `administrator`
-3. Passwort: der Wert von `MIDPOINT_ADMIN_PASSWORD` aus deiner `.env`.
-Erwartet: Du siehst die Startseite von midPoint.
- 
-## 7. Persistenztest
- 
-Ziel: Ein Objekt, das du anlegst, ist nach dem Neuerstellen der Container noch da.
- 
-1. Lege einen Testbenutzer an. In der deutschen Oberfläche: Menü **Benutzer**, dann **Neuer Benutzer**, dann **Person** wählen. Trage im Feld **Name** `persistenz-test` ein und klicke oben auf **Save**. Erwartet: Eine grüne Meldung erscheint, und der Benutzer steht unter **Alle Benutzer** in der Liste. In einer englischen Oberfläche heißen die Menüpunkte anders (Users, New user).
-2. Container entfernen, aber die Volumes behalten. Dieser Befehl hat **kein** `-v`:
+3. Passwort: Wert von `MIDPOINT_ADMIN_PASSWORD` aus der lokalen `.env`.
+
+Erwartet: Die Anmeldung ist erfolgreich und die midPoint-Startseite erscheint.
+
+### Keycloak
+
+1. http://localhost:8081/admin/ öffnen.
+2. Benutzername: `admin`
+3. Passwort: Wert von `KEYCLOAK_ADMIN_PASSWORD` aus der lokalen `.env`.
+
+Erwartet: Die Anmeldung an der Keycloak-Admin-Konsole ist erfolgreich.
+
+Die Zugangsdaten werden bei der Erstinitialisierung verwendet. Eine spätere Änderung der `.env` ändert keine bereits gespeicherten Datenbank- oder Administratorpasswörter.
+
+Beide Anwendungen werden in dieser Phase unabhängig geprüft. Eine Anmeldung über einen gemeinsamen Identity Provider sowie die Provisionierung zwischen midPoint und Keycloak sind damit noch nicht nachgewiesen.
+
+
+## 7. Persistenztest für beide Anwendungen
+
+Ziel: Testobjekte bleiben nach dem Entfernen und Neuerstellen der Container mit denselben Volumes erhalten.
+
+### Testobjekte anlegen
+
+1. In midPoint anmelden und unter **Users → New user** einen Benutzer mit dem Namen `phase3-midpoint-test` anlegen und speichern. In der deutschen Oberfläche heißen die Menüpunkte entsprechend **Benutzer → Neuer Benutzer**.
+2. Prüfen, dass der Benutzer unter **Users → All users** erscheint.
+3. In der Keycloak-Admin-Konsole über **Manage realms → Create realm** einen Realm namens `phase3-persistence-test` anlegen.
+4. Prüfen, dass der Realm in der Realm-Auswahl erscheint.
+
+### Container neu erstellen
+
+Im Ordner `app` ausführen:
+
+```bash
+docker compose -p smartaccess-phase3-test down
+docker compose -p smartaccess-phase3-test up -d
 ```
-docker compose down
-```
-3. Neu starten:
-```
-docker compose up -d
-```
-4. Warte, bis `docker compose ps` bei `midpoint` wieder `healthy` zeigt, und melde dich erneut an.
-5. Prüfe unter **Benutzer**, **Alle Benutzer**, ob `persistenz-test` noch existiert.
-Erwartet: Der Benutzer ist noch da. Die Daten liegen in den benannten Volumes `midpoint_db_data` und `midpoint_home`, nicht in den Containern. Im Log aus Abschnitt 5 steht beim Neustart `filled`.
- 
+
+Dabei kein `-v` verwenden. Den Projektnamen beibehalten, damit dieselben Volumes verwendet werden.
+
+Nach dem Start die Bereitschaft wie in Abschnitt 5 prüfen. Anschließend erneut an beiden Anwendungen anmelden.
+
+Erwartet:
+
+- Der Keycloak-Realm `phase3-persistence-test` ist weiterhin vorhanden.
+- Der midPoint-Benutzer `phase3-midpoint-test` ist weiterhin vorhanden.
+- Beide Weblogins funktionieren.
+- `db-check` meldet für midPoint `filled`; das Schema wird nicht erneut angelegt.
+
+Die Daten liegen in den projektbezogenen Volumes für `midpoint_db_data`, `keycloak_db_data` und `midpoint_home`.
+
+### Abgrenzung zum Upgrade aus Phase 2
+
+Der dokumentierte Mac-Test verwendet mit `smartaccess-phase3-test` eine getrennte Neuinstallation und neue Testobjekte. Die Migration vorhandener Phase-2-Daten wurde damit nicht geprüft.
+
+Insbesondere hat sich der logische Name des midPoint-Datenbank-Volumes von `postgres_data` auf `midpoint_db_data` geändert. Ein vorhandenes Phase-2-Volume wird dadurch nicht automatisch übernommen. Alte Volumes nicht ungeprüft löschen.
+
 ## 8. Wenn etwas nicht klappt
- 
-| Problem | Ursache und Lösung |
+
+| Problem | Prüfung und Vorgehen |
 | --- | --- |
-| „Passwort fehlt“ oder „Admin-Passwort fehlt“ beim Start | In `.env` fehlt `POSTGRES_PASSWORD` oder `MIDPOINT_ADMIN_PASSWORD`. Datei prüfen, speichern, `docker compose up -d` erneut ausführen. |
-| Port 8080 ist belegt | Ein anderes Programm oder ein alter Container nutzt den Port. Mit `docker ps` siehst du laufende Container. Das andere Programm beenden. |
-| `db-check` endet mit Fehler (`didn't complete successfully: exit 2`) | Die Datenbank hat die Verbindung abgelehnt. Mit `docker compose logs db-check` siehst du den Grund. Steht dort `password authentication failed`, passt `POSTGRES_PASSWORD` in `.env` nicht zum Passwort im vorhandenen Datenbank-Volume. Eine neue Angabe in `.env` ändert das gespeicherte Datenbankpasswort nicht. Setze `.env` auf den alten Wert zurück oder setze alles zurück (Abschnitt 9). `midpoint-init` und `midpoint` starten in diesem Fall absichtlich nicht. |
-| `midpoint-init` endet mit Fehler | `docker compose logs midpoint-init` lesen. Meldung dabei nicht raten, sondern im Team nachfragen. |
-| `midpoint` bleibt länger als etwa fünf Minuten `unhealthy` | Log lesen: `docker compose logs --tail 50 midpoint`. Meldung im Team nachfragen. |
-| Login mit `administrator` schlägt fehl | Das Admin-Passwort wird laut midPoint-Dokumentation nur beim ersten Start einer leeren Installation gesetzt. Eine spätere Änderung in `.env` wirkt nicht. Siehe Abschnitt 9. |
-| Warnung „Found orphan containers“ | Harmlos. Im Ordner `app` laufen noch Container aus einem früheren Projekt mit demselben Projektnamen. |
-| Meldung „Network app_default Resource is still in use“ beim `down` | Harmlos. Andere Container nutzen das Netzwerk noch. |
- 
-## 9. Alles zurücksetzen
- 
-Nur wenn du lokal neu anfangen willst, zum Beispiel nach einem geänderten Passwort in `.env`. **Das löscht alle lokalen midPoint-Daten**, auch deine Testbenutzer:
- 
+| Compose meldet ein fehlendes Passwort | Alle vier Variablen in der lokalen `.env` prüfen. Danach `docker compose -p smartaccess-phase3-test config --quiet` ausführen. |
+| Port 8080, 8081 oder 9000 ist belegt | Mit `docker ps` prüfen, welcher Dienst den Port verwendet. Nur bekannte, nicht benötigte Dienste stoppen. |
+| `db-check` endet mit Exit 2 | Lokal das Log von `db-check` prüfen. Bei `password authentication failed` den ursprünglichen Datenbank-Passwortwert wiederherstellen. Eine Änderung der `.env` ändert kein gespeichertes Datenbankpasswort. |
+| Keycloak startet nicht oder ist nicht bereit | Status und lokale Logs von `keycloak` und `keycloak-db` prüfen. Datenbankverbindung, Laufzeitwerte und Build-Ergebnis kontrollieren. |
+| Health oder Metrics liefern kein HTTP 200 | Startbereitschaft, Port 9000 und Build-Optionen prüfen. Nach Änderungen am Dockerfile das Image neu bauen und den Container neu erstellen. |
+| Login schlägt nach einer Passwortänderung in `.env` fehl | Die Änderung rotiert kein bereits gespeichertes Passwort. Den bisherigen gültigen Wert verwenden oder das Passwort gezielt im jeweiligen System ändern. |
+| Warnung zu verwaisten Containern | Prüfen, zu welchem Stack die Container gehören. Keine fremden Container ungeprüft entfernen. |
+
+Logs können vertrauliche Werte enthalten. Nur lokal prüfen und keine ungefilterten Logs oder `.env`-Inhalte veröffentlichen.
+
+## 9. Neuinstallation und vorhandene Daten
+
+Der Test mit dem Projektnamen `smartaccess-phase3-test` verwendet eigene Volumes. Die Trennung der Daten gibt die Host-Ports nicht frei; diese dürfen nur von einem Stack gleichzeitig belegt werden.
+
+Eine Neuinstallation ersetzt keinen Migrationstest. Vorhandene Phase-2-Daten bleiben außerhalb dieses Tests. Ihre Übernahme erfordert eine gesonderte Planung und Prüfung.
+
+Das Löschen von Volumes entfernt die darin gespeicherten Daten. Für die beschriebenen Start-, Stopp- und Persistenztests ist keine Volume-Löschung erforderlich.
+
+## 10. Stoppen und erneut starten
+
+Container stoppen und entfernen, Daten behalten:
+
+```bash
+docker compose -p smartaccess-phase3-test down
 ```
-docker compose down -v
+
+Mit denselben Volumes erneut starten:
+
+```bash
+docker compose -p smartaccess-phase3-test up -d
 ```
- 
-Danach `.env` bei Bedarf anpassen und wie in Abschnitt 4 neu starten. Beim nächsten Start meldet `db-check` wieder `empty`, und das Schema wird neu angelegt.
- 
-## 10. Aufräumen
- 
-Stoppen und Daten behalten:
- 
-```
-docker compose down
-```
- 
-Die Datei `.env` bleibt lokal und wird nicht committet.
- 
+
+Den Projektnamen bei allen Befehlen beibehalten. Die lokale `.env` bleibt außerhalb von Git.

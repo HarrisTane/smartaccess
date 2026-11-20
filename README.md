@@ -4,7 +4,11 @@ SmartAccess ist ein Cloud-Service für befristete Zugriffsrechte. Mit Evolveum m
 
 ## Projektstand
 
-Wir richten in Phase 1 das Repository und die Zusammenarbeit im Dreierteam ein. In Phase 2 folgt der lokale Start von midPoint mit PostgreSQL über Docker Compose.
+Phase 2 ist abgeschlossen. midPoint und PostgreSQL können lokal mit Docker Compose betrieben werden.
+
+In Phase 3 ergänzen wir ein eigenes, optimiertes Keycloak-Image mit Multi-Stage-Build und einer separaten PostgreSQL-Datenbank. Build, Weblogin, Health/Metrics und Datenpersistenz wurden auf einem Mac mit Apple Silicon getestet. Dokumentation und abschließendes Review werden noch vervollständigt.
+
+Die Verbindung zwischen midPoint und Keycloak für die Provisionierung folgt in Phase 6 und ist noch nicht umgesetzt.
 
 ## Repository-Struktur
 
