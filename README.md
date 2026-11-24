@@ -96,7 +96,7 @@ Die Dienste sind ausschließlich für den lokalen Entwicklungsbetrieb konfigurie
 | 14 | End-to-End-Abnahme | A | B | C |
 | 15 | Dokumentation und Abgabe | B | C | A |
 
-## CI-Architektur – Phase 4
+## CI-Architektur - Phase 4
 
 **Status:** Architektur beschlossen, technische Umsetzung ausstehend.
 **Arbeitsbranch:** `feat/phase-4-CI-foundation`
