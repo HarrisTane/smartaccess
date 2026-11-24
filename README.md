@@ -95,6 +95,75 @@ Die Dienste sind ausschließlich für den lokalen Entwicklungsbetrieb konfigurie
 | 13 | Sicherheit und Betriebstests | C | A | B |
 | 14 | End-to-End-Abnahme | A | B | C |
 | 15 | Dokumentation und Abgabe | B | C | A |
+
+## CI-Architektur – Phase 4
+
+**Status:** Architektur beschlossen, technische Umsetzung ausstehend.
+**Arbeitsbranch:** `feat/phase-4-CI-foundation`
+**GitHub-Issue:** [#11](https://github.com/HarrisTane/smartaccess/issues/11)
+
+### Workflow-Trigger
+
+- Push auf `feat/phase-4-CI-foundation`: Build und Tests.
+- Pull Request nach `main`: Automatische Qualitätsprüfung.
+- Push auf `main`: Prüfungen und anschließend Image-Veröffentlichung.
+- `workflow_dispatch`: Manueller Start für Testzwecke.
+
+Eine Veröffentlichung ist ausschließlich bei einem Push auf `main`
+nach erfolgreichen Prüfungen erlaubt.
+
+### CI-Jobs und Abhängigkeiten
+
+1. **Validate:** Docker-Compose-Konfiguration prüfen.
+2. **Build:** Keycloak-Multi-Stage-Image erstellen.
+3. **Test:** Container starten und Funktionstests ausführen.
+4. **Security:** Container-Image auf Schwachstellen prüfen.
+5. **Publish:** Geprüftes Image in GHCR veröffentlichen.
+
+Validate → Build → Test und Security parallel → Publish.
+
+Die Jobs Test und Security verwenden dasselbe Image aus dem
+Build-Job. Dafür wird das Image als GitHub-Actions-Artefakt
+übertragen. Auch Publish verwendet dieses geprüfte Image.
+
+### Automatisierte Tests
+
+- Compose-Konfiguration mit temporären CI-Testwerten validieren.
+- Keycloak-Image erfolgreich bauen.
+- PostgreSQL-Healthchecks beider Datenbanken überprüfen.
+- Keycloak `/health/live` und `/health/ready`: HTTP 200.
+- Keycloak `/metrics`: HTTP 200 und Metrikdaten.
+- HTTP-Erreichbarkeit von midPoint überprüfen.
+- Fehlgeschlagene Pflichtprüfungen müssen den Workflow stoppen.
+- Wartezeiten und Wiederholungsversuche begrenzen.
+
+Für CI werden ausschließlich isolierte Testzugangsdaten verwendet.
+Die CI-Testumgebung benötigt folgende Pflichtvariablen:
+
+- `POSTGRES_PASSWORD`
+- `MIDPOINT_ADMIN_PASSWORD`
+- `KEYCLOAK_DB_PASSWORD`
+- `KEYCLOAK_ADMIN_PASSWORD`
+
+Diese Werte werden ausschließlich für den isolierten Testlauf
+bereitgestellt und dürfen nicht in Images oder Logs gelangen.
+Lokale `.env`-Dateien und echte Passwörter werden nicht übertragen.
+
+### Sicherheits- und Veröffentlichungsregeln
+
+- HIGH- und CRITICAL-Schwachstellen blockieren grundsätzlich
+  die Image-Veröffentlichung.
+- Ausnahmen benötigen eine dokumentierte Risikoanalyse
+  und ausdrückliche Freigabe.
+- Scannerfehler gelten nicht als bestandene Sicherheitsprüfung.
+- GHCR-Schreibrechte erhält ausschließlich der Publish-Job.
+- Veröffentlichte Images erhalten nachvollziehbare Commit-SHA-Tags.
+
+### Abgrenzung
+
+Phase 4 umfasst CI, automatisierte Prüfungen und Image-Veröffentlichung.
+Das automatische Deployment nach `dev` und `staging` folgt in Phase 11.
+
 ## Geplante Cloud-Services-Nachweise
 
 - **Containerisierung** mit Multi-Stage-Dockerfile und Docker Compose
