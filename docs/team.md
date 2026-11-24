@@ -19,14 +19,15 @@ Wir wechseln die Rollen über die Phasen hinweg, damit alle drei praktisch an ve
 | 01 | Repository und Zusammenarbeit | A | A | B oder C |
 | 02 | midPoint lokal mit Docker Compose | A | B | C |
 | 03 | Eigenes Multi-Stage-Image | C | A | B |
-| 04 | IAM-Datenmodell und Rollen | A | B | C |
-| 05 | Zugriffsanträge und Genehmigungen | B | C | A |
-| 06 | Keycloak-Provisionierung und Ablauf | C | A | B |
-| 07 | Terraform und cloud-init | A | B | C |
-| 08 | RKE2-Kubernetes-Cluster | B | C | A |
-| 09 | Helm und Cloud-Deployment | C | A | B |
-| 10 | CI/CD mit GitHub Actions | A | B | C |
-| 11 | Prometheus und Grafana | B | C | A |
-| 12 | Sicherheit und Betriebstests | C | A | B |
-| 13 | End-to-End-Abnahme | A | B | C |
-| 14 | Dokumentation und Abgabe | B | C | A |
+| 04 | CI-Grundlagen mit GitHub Actions | A | C | B |
+| 05 | IAM-Datenmodell und Rollen | B | A | C |
+| 06 | Zugriffsanträge und Genehmigungen | C | B | A |
+| 07 | Keycloak-Provisionierung und Ablauf | A | B | C |
+| 08 | Terraform und cloud-init | C | A | B |
+| 09 | RKE2-Kubernetes-Cluster | B | C | A |
+| 10 | Helm und Cloud-Deployment | C | A | B |
+| 11 | CI/CD vervollständigen (dev und staging) | A | B | C |
+| 12 | Prometheus und Grafana | B | C | A |
+| 13 | Sicherheit und Betriebstests | C | A | B |
+| 14 | End-to-End-Abnahme | A | B | C |
+| 15 | Dokumentation und Abgabe | B | C | A |

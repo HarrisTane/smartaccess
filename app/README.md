@@ -4,7 +4,7 @@ Diese Anleitung beschreibt den lokalen Betrieb von midPoint und einem eigenen, o
 
 Das Keycloak-Image wird mit einem Multi-Stage-Dockerfile gebaut. Die Anleitung umfasst Build, Start, Weblogin, Health-/Metrics-Prüfungen und Persistenztests.
 
-Die Verbindung zwischen midPoint und Keycloak für die Provisionierung folgt in Phase 6 und ist hier noch nicht eingerichtet.
+Die Verbindung zwischen midPoint und Keycloak für die Provisionierung ist noch nicht implementiert. Sie ist für Phase 7 vorgesehen.
 
 ## 1. Voraussetzungen
 
