@@ -46,3 +46,14 @@ jobs:
 
       - name: Show image platform
         run: docker image inspect --format '{{.Os}}/{{.Architecture}}' smartaccess-keycloak:local
+
+      - name: Save Keycloak image
+        run: docker image save --output keycloak-image.tar smartaccess-keycloak:local
+
+      - name: Upload Keycloak image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: keycloak-image
+          path: keycloak-image.tar
+          if-no-files-found: error
+          retention-days: 7
