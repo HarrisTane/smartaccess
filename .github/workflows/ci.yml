@@ -57,3 +57,66 @@ jobs:
           path: keycloak-image.tar
           if-no-files-found: error
           retention-days: 7
+
+  test:
+    name: Smoke test Keycloak and midPoint
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      POSTGRES_PASSWORD: ci-only-midpoint-db
+      MIDPOINT_ADMIN_PASSWORD: ci-only-midpoint-admin
+      KEYCLOAK_DB_PASSWORD: ci-only-keycloak-db
+      KEYCLOAK_ADMIN_PASSWORD: ci-only-keycloak-admin
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Download Keycloak image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: keycloak-image
+
+      - name: Load the built image
+        run: docker image load --input keycloak-image.tar
+
+      - name: Start the Compose stack
+        run: |
+          docker compose --env-file /dev/null -f app/compose.yaml \
+            up --no-build --wait --wait-timeout 300 midpoint keycloak
+
+      - name: Check Keycloak health and metrics and midPoint HTTP access
+        shell: bash
+        run: |
+          check_http_200() {
+            local url="$1"
+            local output="$2"
+            shift 2
+            local status
+
+            status=$(curl --fail --silent --show-error \
+              --max-time 5 --retry 30 --retry-delay 4 \
+              --retry-max-time 150 --retry-all-errors \
+              --output "$output" --write-out '%{http_code}' "$@" "$url")
+
+            echo "$url returned HTTP $status"
+            test "$status" = 200
+          }
+
+          check_http_200 http://127.0.0.1:9000/health/live "$RUNNER_TEMP/keycloak-live.json"
+          jq -e '.status == "UP"' "$RUNNER_TEMP/keycloak-live.json" >/dev/null
+
+          check_http_200 http://127.0.0.1:9000/health/ready "$RUNNER_TEMP/keycloak-ready.json"
+          jq -e '.status == "UP"' "$RUNNER_TEMP/keycloak-ready.json" >/dev/null
+
+          check_http_200 http://127.0.0.1:9000/metrics "$RUNNER_TEMP/keycloak-metrics.txt"
+          grep -q '^# TYPE ' "$RUNNER_TEMP/keycloak-metrics.txt"
+
+          check_http_200 http://127.0.0.1:8080/midpoint/ /dev/null --location --max-redirs 5
+
+      - name: Show container status on failure
+        if: failure()
+        run: docker compose --env-file /dev/null -f app/compose.yaml ps -a
