@@ -1,0 +1,48 @@
+name: SmartAccess CI
+
+on:
+  push:
+    branches:
+      - feat/phase-4-CI-foundation
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Validate Compose configuration
+        env:
+          POSTGRES_PASSWORD: ci-only-midpoint-db
+          MIDPOINT_ADMIN_PASSWORD: ci-only-midpoint-admin
+          KEYCLOAK_DB_PASSWORD: ci-only-keycloak-db
+          KEYCLOAK_ADMIN_PASSWORD: ci-only-keycloak-admin
+        run: docker compose --env-file /dev/null -f app/compose.yaml config --quiet
+
+  build:
+    name: Build Keycloak image
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build the multi-stage image
+        run: docker build --tag smartaccess-keycloak:local app/keycloak
+
+      - name: Show image platform
+        run: docker image inspect --format '{{.Os}}/{{.Architecture}}' smartaccess-keycloak:local
