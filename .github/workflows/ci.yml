@@ -115,7 +115,7 @@ jobs:
           check_http_200 http://127.0.0.1:9000/metrics "$RUNNER_TEMP/keycloak-metrics.txt"
           grep -q '^# TYPE ' "$RUNNER_TEMP/keycloak-metrics.txt"
 
-          check_http_200 http://127.0.0.1:8080/midpoint/ /dev/null --location --max-redirs 5
+          check_http_200 http://127.0.0.1:8080/midpoint/actuator/health /dev/null
 
       - name: Show container status on failure
         if: failure()
