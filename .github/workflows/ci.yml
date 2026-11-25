@@ -1,5 +1,6 @@
 name: SmartAccess CI
 
+# Pushes auf dem Phase-4-Branch testen den Workflow vor der Integration in main.
 on:
   push:
     branches:
@@ -10,6 +11,7 @@ on:
       - main
   workflow_dispatch:
 
+# Für die Prüfjobs reicht Lesezugriff auf den Repository-Inhalt.
 permissions:
   contents: read
 
@@ -21,14 +23,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
+          # Der Checkout-Token wird für die folgenden Schritte nicht benötigt.
           persist-credentials: false
 
       - name: Validate Compose configuration
+        # Die Testwerte erfüllen die Pflichtvariablen von Compose.
         env:
           POSTGRES_PASSWORD: ci-only-midpoint-db
           MIDPOINT_ADMIN_PASSWORD: ci-only-midpoint-admin
           KEYCLOAK_DB_PASSWORD: ci-only-keycloak-db
           KEYCLOAK_ADMIN_PASSWORD: ci-only-keycloak-admin
+        # Die Konfiguration ohne lokale .env-Datei prüfen, ohne Container zu starten.
         run: docker compose --env-file /dev/null -f app/compose.yaml config --quiet
 
   build:
@@ -42,11 +47,13 @@ jobs:
           persist-credentials: false
 
       - name: Build the multi-stage image
+        # Der Tag entspricht dem Image-Namen in app/compose.yaml.
         run: docker build --tag smartaccess-keycloak:local app/keycloak
 
       - name: Show image platform
         run: docker image inspect --format '{{.Os}}/{{.Architecture}}' smartaccess-keycloak:local
 
+      # Test, Security und Publish erhalten das Image aus diesem Build.
       - name: Save Keycloak image
         run: docker image save --output keycloak-image.tar smartaccess-keycloak:local
 
@@ -63,6 +70,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Die Datenbanken und Dienste starten mit Zugangsdaten für den CI-Test.
     env:
       POSTGRES_PASSWORD: ci-only-midpoint-db
       MIDPOINT_ADMIN_PASSWORD: ci-only-midpoint-admin
@@ -84,6 +92,8 @@ jobs:
         run: docker image load --input keycloak-image.tar
 
       - name: Start the Compose stack
+        # Compose wartet auf die Datenbanken und führt die midPoint-Initialisierung aus.
+        # --no-build stellt sicher, dass Keycloak mit dem geladenen Image startet.
         run: |
           docker compose --env-file /dev/null -f app/compose.yaml \
             up --no-build --wait --wait-timeout 300 midpoint keycloak
@@ -91,6 +101,7 @@ jobs:
       - name: Check Keycloak health and metrics and midPoint HTTP access
         shell: bash
         run: |
+          # Anlaufzeit zulassen und am Ende genau HTTP 200 verlangen.
           check_http_200() {
             local url="$1"
             local output="$2"
@@ -106,22 +117,28 @@ jobs:
             test "$status" = 200
           }
 
+          # Beide Health-Endpunkte müssen zusätzlich den Status UP melden.
           check_http_200 http://127.0.0.1:9000/health/live "$RUNNER_TEMP/keycloak-live.json"
           jq -e '.status == "UP"' "$RUNNER_TEMP/keycloak-live.json" >/dev/null
 
           check_http_200 http://127.0.0.1:9000/health/ready "$RUNNER_TEMP/keycloak-ready.json"
           jq -e '.status == "UP"' "$RUNNER_TEMP/keycloak-ready.json" >/dev/null
 
+          # Eine TYPE-Zeile bestätigt das erwartete Metrikformat.
           check_http_200 http://127.0.0.1:9000/metrics "$RUNNER_TEMP/keycloak-metrics.txt"
           grep -q '^# TYPE ' "$RUNNER_TEMP/keycloak-metrics.txt"
 
+          # Der Health-Endpunkt ist unabhängig von den Login-Weiterleitungen der Weboberfläche.
           check_http_200 http://127.0.0.1:8080/midpoint/actuator/health /dev/null
 
       - name: Show container status on failure
+        # Bei einem Fehler auch beendete Initialisierungscontainer anzeigen.
         if: failure()
         run: docker compose --env-file /dev/null -f app/compose.yaml ps -a
+
   security:
     name: Scan Keycloak image with Trivy
+    # Wie der Smoke-Test hängt der Scan nur vom Build ab. Beide können parallel laufen.
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -135,6 +152,8 @@ jobs:
       - name: Scan for high and critical vulnerabilities
         shell: bash
         run: |
+          # Trivy liest das Image-Archiv direkt. Der Digest fixiert das Scanner-Image.
+          # HIGH- und CRITICAL-Funde lassen den Job trotz der Ausgabe über tee fehlschlagen.
           docker run --rm \
             --mount "type=bind,source=$PWD/keycloak-image.tar,target=/scan/keycloak-image.tar,readonly" \
             ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
@@ -143,6 +162,7 @@ jobs:
             --exit-code 1 --timeout 10m 2>&1 | tee trivy-report.txt
 
       - name: Upload Trivy report
+        # Auch bei einem fehlgeschlagenen Scan bleibt der Bericht verfügbar.
         if: ${{ always() && hashFiles('trivy-report.txt') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -150,12 +170,15 @@ jobs:
           path: trivy-report.txt
           if-no-files-found: error
           retention-days: 7
+
   publish:
     name: Publish the verified Keycloak image to GHCR
+    # Nur ein Push auf main mit erfolgreichen Prüfjobs darf veröffentlichen.
     needs: [test, security]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
+      # Nur dieser Job darf Pakete in GHCR schreiben.
       packages: write
 
     steps:
@@ -172,6 +195,8 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # GHCR erwartet einen kleingeschriebenen Image-Namen.
+          # Der vollständige Commit-SHA ordnet das Image dem Quellstand zu.
           image="ghcr.io/${GITHUB_REPOSITORY,,}-keycloak:${GITHUB_SHA}"
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
             --username "$GITHUB_ACTOR" --password-stdin
