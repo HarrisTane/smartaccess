@@ -150,3 +150,30 @@ jobs:
           path: trivy-report.txt
           if-no-files-found: error
           retention-days: 7
+  publish:
+    name: Publish the verified Keycloak image to GHCR
+    needs: [test, security]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Download Keycloak image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: keycloak-image
+
+      - name: Load the verified image
+        run: docker image load --input keycloak-image.tar
+
+      - name: Publish the image with its commit SHA
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-keycloak:${GITHUB_SHA}"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+          docker image tag smartaccess-keycloak:local "$image"
+          docker image push "$image"
