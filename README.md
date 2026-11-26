@@ -41,6 +41,7 @@ Die vollständige lokale Installations-, Build- und Testanleitung befindet sich 
 
 | Ordner   | Zweck                                                 |
 | -------- | ----------------------------------------------------- |
+| `.github`| GitHub Actions, CI/CD und Repository-Automatisierung  |                                                    
 | `app/`   | midPoint-Konfiguration, Dockerfile und Docker Compose |
 | `docs/`  | Architektur, Entscheidungen und Betriebshinweise      |
 | `infra/` | Terraform und cloud-init für OpenStack                |
