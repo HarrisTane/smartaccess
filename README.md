@@ -99,9 +99,13 @@ Die Dienste sind ausschließlich für den lokalen Entwicklungsbetrieb konfigurie
 
 ## CI-Architektur - Phase 4
 
-**Status:** Architektur beschlossen, technische Umsetzung ausstehend.
+**Status:** Der CI-Workflow ist implementiert und auf dem Phase-4-Branch getestet. Die Veröffentlichung in GHCR steht noch aus.
+
 **Arbeitsbranch:** `feat/phase-4-CI-foundation`
+
 **GitHub-Issue:** [#11](https://github.com/HarrisTane/smartaccess/issues/11)
+
+In [Run #6](https://github.com/HarrisTane/smartaccess/actions/runs/45550475659) wurde das Keycloak-Image mit Version `26.8.2` auf `linux/amd64` gebaut. Die Compose-Validierung und die Smoke-Tests für Keycloak und midPoint waren erfolgreich. Trivy meldete sechs HIGH-Funde und keine CRITICAL-Funde. Der Bericht wurde als Artefakt `trivy-report` gespeichert. Der Publish-Job wurde auf dem Phase-4-Branch übersprungen.
 
 ### Workflow-Trigger
 
